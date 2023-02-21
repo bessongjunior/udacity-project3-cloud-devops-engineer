@@ -1,5 +1,6 @@
 version: 2.1
 
+# 1b:1f:ce:9f:4b:8a:4b:6d:d1:9f:1a:73:95:4a:e7:94
 orbs:
   slack: circleci/slack@4.12.0
   aws-cli: circleci/aws-cli@3.1.4
@@ -43,7 +44,6 @@ commands:
             then
               cd ~/project/backend
               npm install
-              npm run build
               #  Add revert code here. You can find this in the Getting Started section.
               npm run migrations:revert
             fi
@@ -194,36 +194,56 @@ jobs:
   deploy-infrastructure:
     docker:
       # Docker image here that supports AWS CLI
+      - image: amazon/aws-cli
     steps:
       # Checkout code from git
+      - checkout
+
+      - run: 
+          name: Install tar utils
+          command: |
+            yum install -y tar gzip
+
       - run:
           name: Ensure back-end infrastructure exists
           command: |
             aws cloudformation deploy \
               --template-file .circleci/files/backend.yml \
-              #--tags project=your-tag \
-              # --stack-name "your back-end stack name with workflow id" \
-              # --parameter-overrides ID="your workflow id"  
-              exit 1
+              --tags project=your-tag \
+              --stack-name udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7} \
+              --parameter-overrides ID=${CIRCLE_WORKFLOW_ID:0:7}  
+              
       - run:
           name: Ensure front-end infrastructure exist
           command: |
             aws cloudformation deploy \
               --template-file .circleci/files/frontend.yml \
-              #--tags project=your-tag \
-              # --stack-name "your front-end stack name with workflow id" \
-              # --parameter-overrides ID="your workflow id"  
-              exit 1
+              --tags project=your-tag \
+              --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7} \
+              --parameter-overrides ID=${CIRCLE_WORKFLOW_ID:0:7}  
+             
       - run:
           name: Add back-end ip to ansible inventory
           command: |
             # Your code here
-            exit 1
+            aws ec2 describe-instances \
+            --filters "Name=tag:aws:cloudformation:stack-name,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+            --query "Reservations[*].Instances[*].PublicIpAddress" \
+            --output text >> .circleci/ansible/inventory.txt
+            
       - persist_to_workspace:
           root: ~/
           paths:
             - project/.circleci/ansible/inventory.txt
+
+      # - slack/notify:
+      #     branch_pattern: master
+      #     channel: C04CPS646NP
+      #     event: fail
+      #     template: basic_fail_1
       # Here's where you will add some code to rollback on failure      
+      - destroy-environment:
+          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
 
   configure-infrastructure:
     docker:
@@ -235,7 +255,7 @@ jobs:
       # Add ssh keys with fingerprint
       - add_ssh_keys:
          fingerprints:
-            - " "
+            - "1b:1f:ce:9f:4b:8a:4b:6d:d1:9f:1a:73:95:4a:e7:94"
       # attach workspace
       - attach_workspace:
           at: ~/
@@ -263,11 +283,11 @@ jobs:
             ls -al
             ansible-playbook -i inventory.txt configure-server.yml
           no_output_timeout: 30m
-      - slack/notify:
-          branch_pattern: master
-          channel: C04CPS646NP
-          event: fail
-          template: basic_fail_1
+      # - slack/notify:
+      #     branch_pattern: master
+      #     channel: C04CPS646NP
+      #     event: fail
+      #     template: basic_fail_1
       # Here's where you will add some code to rollback on failure
       - destroy-environment:
           workflow_id: ${CIRCLE_WORKFLOW_ID:0:7} 
@@ -361,7 +381,7 @@ jobs:
       # Add ssh keys with fingerprint
       - add_ssh_keys:
           fingerprints:
-            - "53:d3:c5:8e:a4:88:96:07:1c:95:a6:62:76:8a:a8:f8"
+            - "1b:1f:ce:9f:4b:8a:4b:6d:d1:9f:1a:73:95:4a:e7:94"
       # attach workspace
       - attach_workspace:
           at: ~/
